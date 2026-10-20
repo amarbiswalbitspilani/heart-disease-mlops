@@ -1,0 +1,149 @@
+name: ci
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+# "shell: bash" runs every step with -eo pipefail, so a failing command piped into tee fails the step.
+defaults:
+  run:
+    shell: bash
+
+env:
+  PYTHON_VERSION: "3.11"
+
+jobs:
+  lint:
+    name: Lint (ruff)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+      - name: Install ruff (version pinned in requirements.txt)
+        run: pip install "$(grep '^ruff==' requirements.txt)"
+      - name: Lint
+        run: ruff check --output-format=github . 2>&1 | tee ruff.log
+      - name: Format check
+        if: success() || failure()  # also when lint failed, so the log has both results
+        run: ruff format --check . 2>&1 | tee -a ruff.log
+      - name: Upload lint log
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: lint-log
+          path: ruff.log
+
+  test:
+    name: Unit tests (pytest)
+    needs: lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+      - name: Run tests  # tests read the committed raw file; no network needed
+        run: python -m pytest -v --junitxml=test-results.xml 2>&1 | tee pytest.log
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: test-results
+          path: |
+            test-results.xml
+            pytest.log
+
+  train:
+    name: Train and track models
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+      - name: Download and clean the dataset
+        run: python scripts/download_data.py
+      - name: Train (grid search, cross-validation, MLflow tracking)
+        run: PYTHONPATH=src python -m heart.train 2>&1 | tee training.log
+      - name: Score the sample patient with the trained model
+        run: python scripts/predict.py | tee -a training.log
+      - name: Write results to the run summary
+        run: |
+          {
+            echo "## Model training"
+            echo '```'
+            sed -n '/^Cross-validation/,$p' training.log
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+      - name: Upload model, metrics and MLflow runs
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: model-and-metrics
+          path: |
+            training.log
+            models/model.joblib
+            reports/metrics.json
+            reports/mlflow_runs.csv
+            reports/runs/
+            mlflow.db
+            mlruns/
+
+  docker:
+    name: Build and smoke-test the API image
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Build image
+        run: docker build -t heart-api:ci . 2>&1 | tee docker-build.log
+      - name: Run container and call the API
+        run: |
+          docker run -d --name heart-api -p 8000:8000 heart-api:ci
+          for i in $(seq 1 30); do curl -sf localhost:8000/health && break; sleep 1; done
+          echo | tee smoke.log
+          curl -sf localhost:8000/health | tee -a smoke.log; echo | tee -a smoke.log
+          curl -sf -X POST localhost:8000/predict -H 'Content-Type: application/json' \
+            -d @api/sample_input.json | tee -a smoke.log | grep -q '"prediction"'
+          echo | tee -a smoke.log
+          # The sample with an impossible age: rejected by the range check, not a missing field.
+          python3 -c "import json; d = json.load(open('api/sample_input.json')); d['age'] = 5; print(json.dumps(d))" > invalid.json
+          code=$(curl -s -o /dev/null -w '%{http_code}' -X POST localhost:8000/predict \
+            -H 'Content-Type: application/json' -d @invalid.json)
+          echo "age 5 -> HTTP $code" | tee -a smoke.log
+          test "$code" = "422"
+          # The model trained inside the image must predict like the committed model (bytes can
+          # differ between CPUs, so the check compares predicted probabilities on all rows).
+          docker run --rm -v "$PWD:/repo:ro" --entrypoint python heart-api:ci \
+            /repo/scripts/check_model_parity.py /app/models/model.joblib \
+            /repo/models/model.joblib /repo/data/processed/heart_clean.csv | tee -a smoke.log
+      - name: Container logs
+        if: always()
+        run: docker logs heart-api 2>&1 | tee container.log || true
+      - name: Upload build and smoke-test logs
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: docker-logs
+          path: |
+            docker-build.log
+            smoke.log
+            container.log
