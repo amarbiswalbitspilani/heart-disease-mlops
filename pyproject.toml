@@ -1,0 +1,27 @@
+[project]
+name = "heart-disease-mlops"
+version = "1.0.0"
+description = "Heart disease risk classifier with experiment tracking, CI/CD, containerised serving and monitoring"
+requires-python = ">=3.11,<3.12"
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+extend-include = ["*.ipynb"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP"]
+
+[tool.ruff.lint.per-file-ignores]
+# Notebooks put src/ on sys.path before importing the project package.
+"notebooks/*.ipynb" = ["E402"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["heart", "api"]
+
+[tool.pytest.ini_options]
+pythonpath = ["src", "."]
+testpaths = ["test"]
+addopts = "-q"
+# Raised inside MLflow's own SQLAlchemy store when a tracking database is opened; not our code.
+filterwarnings = ["ignore:The ``noload`` loader strategy is deprecated:sqlalchemy.exc.SADeprecationWarning"]

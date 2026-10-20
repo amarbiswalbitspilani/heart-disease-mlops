@@ -1,0 +1,10 @@
+# Runtime dependencies of the serving image only (no MLflow, notebooks or test tools).
+# Compiled with requirements.txt as constraints, so serving uses the same versions as training.
+fastapi
+uvicorn
+pydantic
+prometheus-client
+scikit-learn
+pandas
+numpy
+joblib

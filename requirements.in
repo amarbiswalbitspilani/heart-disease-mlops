@@ -1,0 +1,16 @@
+# Direct dependencies; requirements.txt is the pinned lock compiled from this file for Python 3.11.
+numpy
+pandas
+scikit-learn
+matplotlib
+seaborn
+mlflow
+fastapi
+uvicorn
+prometheus-client
+pytest
+httpx2
+ruff
+jupyter
+nbconvert
+ipykernel
