@@ -12,8 +12,8 @@
   "models": [
     {
       "name": "logistic_regression",
-      "run_id": "095a8df96ad041c48d283e368ba2d306",
-      "model_uri": "models:/m-ad5377e8103c4cf483076c53a67920f5",
+      "run_id": "d306530eb3be4d3ab1925c01bee59f92",
+      "model_uri": "models:/m-322417c8093c4e14a2b1dce9114262b4",
       "best_params": {
         "C": 1.0,
         "class_weight": "balanced",
@@ -47,8 +47,8 @@
     },
     {
       "name": "random_forest",
-      "run_id": "2461c9ff18434492a81fe801cfe3e67e",
-      "model_uri": "models:/m-aa811f63c38348889f12d4da6f5f8333",
+      "run_id": "43877d69c90f42cdbccb4ffdff95c5e2",
+      "model_uri": "models:/m-9406a2b659f24a3dacdc16ae16771f44",
       "best_params": {
         "class_weight": null,
         "max_depth": 3,
