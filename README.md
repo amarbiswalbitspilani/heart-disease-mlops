@@ -8,6 +8,10 @@ cross-validation, MLflow experiment tracking and model registry, unit tests and 
 CI, a FastAPI service in Docker, deployment on Kubernetes behind a LoadBalancer, and monitoring
 with Prometheus and Grafana.
 
+**Author:** Amar Kumar Biswal (2025AE05569) ·
+**Report:** [`report/heart_disease_mlops_report.pdf`](report/heart_disease_mlops_report.pdf) ·
+**Video walkthrough:** [Google Drive](https://drive.google.com/file/d/1YUYkeGyjGZf7dX4_nhorlyornJSBLwSc/view?usp=sharing)
+
 **Dataset:** Heart Disease, UCI Machine Learning Repository (dataset id 45), processed Cleveland
 file: 303 patients, 13 features and `num` (disease grade 0–4), turned into a binary target
 (0 = absent, 1 = present).
