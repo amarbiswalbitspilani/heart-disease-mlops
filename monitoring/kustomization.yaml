@@ -1,0 +1,19 @@
+# kubectl apply -k monitoring/   (Prometheus + Grafana in the "heart" namespace)
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: heart
+resources:
+  - prometheus.yaml
+  - grafana.yaml
+configMapGenerator:
+  - name: grafana-datasources
+    files:
+      - prometheus.yaml=grafana-datasource.yaml
+  - name: grafana-dashboard-provider
+    files:
+      - heart.yaml=grafana-dashboard-provider.yaml
+  - name: grafana-dashboards
+    files:
+      - heart-api.json=grafana-dashboard.json
+generatorOptions:
+  disableNameSuffixHash: true

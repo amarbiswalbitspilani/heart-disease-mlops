@@ -1,0 +1,17 @@
+# External entry point: a LoadBalancer Service. On Minikube the MetalLB addon assigns the
+# external IP; on GKE/EKS/AKS the cloud provider's load balancer does, with no change here.
+apiVersion: v1
+kind: Service
+metadata:
+  name: heart-api
+  namespace: heart
+  labels:
+    app: heart-api
+spec:
+  type: LoadBalancer
+  selector:
+    app: heart-api
+  ports:
+    - name: http
+      port: 80
+      targetPort: http

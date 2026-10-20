@@ -1,0 +1,88 @@
+# Prometheus scrapes /metrics on every API pod. The headless Service resolves to one DNS
+# A record per ready pod, so each replica is scraped separately (no RBAC needed).
+apiVersion: v1
+kind: Service
+metadata:
+  name: heart-api-pods
+  namespace: heart
+spec:
+  clusterIP: None
+  selector:
+    app: heart-api
+  ports:
+    - name: http
+      port: 8000
+      targetPort: http
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: prometheus-config
+  namespace: heart
+data:
+  prometheus.yml: |
+    global:
+      scrape_interval: 5s
+      evaluation_interval: 15s
+    scrape_configs:
+      - job_name: heart-api
+        metrics_path: /metrics
+        dns_sd_configs:
+          - names: ["heart-api-pods.heart.svc.cluster.local"]
+            type: A
+            port: 8000
+            refresh_interval: 15s
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: prometheus
+  namespace: heart
+  labels:
+    app: prometheus
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: prometheus
+  template:
+    metadata:
+      labels:
+        app: prometheus
+    spec:
+      containers:
+        - name: prometheus
+          image: prom/prometheus:v3.5.0
+          imagePullPolicy: IfNotPresent
+          args:
+            - --config.file=/etc/prometheus/prometheus.yml
+            - --storage.tsdb.retention.time=2d
+          ports:
+            - name: web
+              containerPort: 9090
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              memory: 512Mi
+          volumeMounts:
+            - name: config
+              mountPath: /etc/prometheus
+      volumes:
+        - name: config
+          configMap:
+            name: prometheus-config
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: prometheus
+  namespace: heart
+spec:
+  selector:
+    app: prometheus
+  ports:
+    - name: web
+      port: 9090
+      targetPort: web
